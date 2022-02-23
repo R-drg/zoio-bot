@@ -1,5 +1,5 @@
 import { Message, MessageEmbed, User } from "discord.js";
-import { Card, Game } from "../dtos/uno.dto";
+import { Card, Color, Game } from "../dtos/uno.dto";
 import logger from "../logger";
 import { unoDeck } from "../utils";
 import { discordClient } from "../client";
@@ -111,7 +111,9 @@ function showStatus(message: Message) {
       .addField("Players", game.players.length.toString())
       .addField(
         "Card on top of pile",
-        game.discard[game.discard.length - 1]?.type ?? "None"
+        `${game.discard[game.discard.length - 1]?.type} - ${
+          game.discard[game.discard.length - 1]?.color
+        }` ?? "None"
       );
     return message.channel.send({ embed });
   }
@@ -174,7 +176,7 @@ function startGame(message: Message) {
       }
     }
   });
-  logger.info(`Game started`, { game });
+  logger.info(`Game started`, game.id);
   const embed = new MessageEmbed()
     .setTitle("Game started")
     .setDescription(`Game ID: ${game.id}`)
@@ -186,7 +188,9 @@ function startGame(message: Message) {
     .addField("Players", game.players.length.toString())
     .addField(
       "Card on top of pile",
-      game.discard[game.discard.length - 1]?.type ?? "None"
+      `${game.discard[game.discard.length - 1]?.type} - ${
+        game.discard[game.discard.length - 1]?.color
+      }` ?? "None"
     );
   game.players.forEach((player) => {
     const playerHand = new MessageEmbed()
@@ -234,6 +238,162 @@ const showHand = (message: Message) => {
   return message.author.send({ embed });
 };
 
+const playCard = (message: Message) => {
+  const game = games.find((g) => g.id === message.channel.id);
+  if (!game) {
+    return noGameFound(message);
+  }
+  if (!game.started) {
+    return gameNotStarted(game, message);
+  }
+  const player = game.players.find((p) => p.id === message.author.id);
+  if (!player) {
+    return message.channel.send({
+      embed: {
+        title: "Not in game",
+        description: "You are not in this game",
+        color: "#ea7373",
+      },
+    });
+  }
+  if (player.id !== game.currentPlayer?.id) {
+    return message.channel.send({
+      embed: {
+        title: "Not your turn",
+        description: "It is not your turn",
+        color: "#ea7373",
+      },
+    });
+  }
+  const args = message.content.split(" ");
+  if (args.length < 4) {
+    return message.channel.send({
+      embed: {
+        title: "Not enough arguments",
+        description: "You need to specify a card to play",
+        color: "#ea7373",
+      },
+    });
+  }
+  player.hand.forEach((c) => {
+    console.log(c.type == args[2]);
+    console.log(c.type, args[2]);
+    console.log(c.color == args[3]);
+    console.log(c.color, args[3]);
+  });
+  const card = player.hand.filter((c) => {
+    if (
+      c.type.toLowerCase() == args[2].toLowerCase() &&
+      c.color.toLowerCase() == args[3].toLowerCase()
+    ) {
+      return true;
+    }
+    return false;
+  })[0];
+  console.log(card);
+  if (!card) {
+    return message.channel.send({
+      embed: {
+        title: "Card not found",
+        description: "Card not found in your hand",
+        color: "#ea7373",
+      },
+    });
+  }
+  //assert that playing card matches color or type of top card in discard except if playing wild
+  if (
+    card.type != "Wild" &&
+    card.type != "Wild Draw Four" &&
+    game.discard[game.discard.length - 1]?.color != card.color &&
+    game.discard[game.discard.length - 1]?.type != card.type
+  ) {
+    return message.channel.send({
+      embed: {
+        title: "Invalid card",
+        description: "Card does not match top card in discard",
+        color: "#ea7373",
+      },
+    });
+  }
+  if (card.type === "Wild" || card.type === "Wild Draw Four") {
+    if (args.length < 5) {
+      return message.channel.send({
+        embed: {
+          title: "Not enough arguments",
+          description: "You need to specify the new color",
+          color: "#ea7373",
+        },
+      });
+    }
+    const newColor = args[4];
+    if (
+      newColor !== "Red" &&
+      newColor !== "Blue" &&
+      newColor !== "Green" &&
+      newColor !== "Yellow"
+    ) {
+      return message.channel.send({
+        embed: {
+          title: "Invalid color",
+          description: "Color must be one of Red, Blue, Green or Yellow",
+          color: "#ea7373",
+        },
+      });
+    }
+    card.color = newColor as Color;
+  }
+  player.hand = player.hand.filter(
+    (c) => c.type !== card.type || c.color !== card.color
+  );
+  game.discard.push(card);
+  if (card.type === "Draw Two") {
+    for (let i = 0; i < 2; i++) {
+      const card = drawCard(game, false);
+      if (card) {
+        player.hand.push(card);
+      }
+    }
+  } else if (card.type === "Wild Draw Four") {
+    for (let i = 0; i < 4; i++) {
+      const card = drawCard(game, false);
+      if (card) {
+        player.hand.push(card);
+      }
+    }
+  } else if (card.type === "Skip") {
+    game.currentPlayer =
+      game.players[(game.players.indexOf(player) + 1) % game.players.length];
+  } else if (card.type === "Reverse") {
+    game.players.reverse();
+  }
+  game.turnCount++;
+  // skip to next player
+  if (game.currentPlayer) {
+    game.currentPlayer =
+      game.players[
+        (game.players.indexOf(game.currentPlayer) + 1) % game.players.length
+      ];
+  }
+  logger.info(`Card played`, { game, player, card });
+  const embed = new MessageEmbed()
+    .setTitle("Card played")
+    .setDescription(`Game ID: ${game.id}`)
+    .setColor("#ea7373")
+    .addField("Current Player", game.currentPlayer?.name ?? "None")
+    .addField("Turn", game.turnCount.toString())
+    .addField("Discard", game.discard.length.toString())
+    .addField("Deck", game.deck.length.toString())
+    .addField("Players", game.players.length.toString())
+    .addField(
+      "Card on top of pile",
+      `${game.discard[game.discard.length - 1]?.type} - ${
+        game.discard[game.discard.length - 1]?.color
+      }` ?? "None"
+    );
+
+  return message.channel.send({ embed });
+};
+
 const argsFunction: any = {
   create: (message: Message) => {
     createGame(message);
@@ -249,6 +409,9 @@ const argsFunction: any = {
   },
   hand: (message: Message) => {
     showHand(message);
+  },
+  play: (message: Message) => {
+    playCard(message);
   },
 };
 
