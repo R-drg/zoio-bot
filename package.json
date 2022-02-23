@@ -1,0 +1,21 @@
+{
+  "name": "zoio-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "dotenv-cli": "^5.0.0",
+    "eslint": "^8.9.0",
+    "ts-node-dev": "^1.1.8",
+    "typescript": "^4.5.5"
+  },
+  "scripts": {
+    "start": "node dist/index",
+    "build": "tsc",
+    "dev": "dotenv ts-node-dev src/index.ts"
+  },
+  "dependencies": {
+    "discord.js": "^13.6.0",
+    "dotenv": "^16.0.0"
+  }
+}
