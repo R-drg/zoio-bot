@@ -16,7 +16,7 @@ declare module "discord.js" {
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 
-export const initializeClient = () => {
+export const discordClient = (function () {
   const client = new Client();
 
   client.commands = new Collection();
@@ -37,4 +37,4 @@ export const initializeClient = () => {
   client.login(TOKEN);
 
   return client;
-};
+})();

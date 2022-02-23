@@ -1,9 +1,30 @@
-import { Message, MessageEmbed } from "discord.js";
+import { Message, MessageEmbed, User } from "discord.js";
 import { Card, Game } from "../dtos/uno.dto";
 import logger from "../logger";
 import { unoDeck } from "../utils";
+import { discordClient } from "../client";
 
 const games: Game[] = [];
+
+const noGameFound = (message: Message) => {
+  return message.channel.send({
+    embed: {
+      title: "No game found",
+      description: "No game found, create a game with `$uno create`",
+      color: "#ea7373",
+    },
+  });
+};
+
+const gameNotStarted = (game: Game, message: Message) => {
+  const embed = new MessageEmbed()
+    .setTitle("Game not started")
+    .setDescription(`Game ID: ${game.id}`)
+    .setColor("#ea7373")
+    .addField("Players", game.players.length.toString())
+    .addField("To Start", "`$uno start`");
+  return message.channel.send({ embed });
+};
 
 function createGame(message: Message) {
   const player = {
@@ -36,13 +57,7 @@ function createGame(message: Message) {
 function joinGame(message: Message) {
   const game = games.find((g) => g.id === message.channel.id);
   if (!game) {
-    return message.channel.send({
-      embed: {
-        title: "No game found",
-        description: "No game found, create a game with `$uno create`",
-        color: "#ea7373",
-      },
-    });
+    return noGameFound(message);
   }
   if (game.players.length >= 4) {
     return message.channel.send({
@@ -82,13 +97,7 @@ function joinGame(message: Message) {
 function showStatus(message: Message) {
   const game = games.find((g) => g.id === message.channel.id);
   if (!game) {
-    return message.channel.send({
-      embed: {
-        title: "No game found",
-        description: "No game found, create a game with `$uno create`",
-        color: "#ea7373",
-      },
-    });
+    return noGameFound(message);
   }
   if (game.started) {
     const embed = new MessageEmbed()
@@ -106,13 +115,7 @@ function showStatus(message: Message) {
       );
     return message.channel.send({ embed });
   }
-  const embed = new MessageEmbed()
-    .setTitle("Game not started")
-    .setDescription(`Game ID: ${game.id}`)
-    .setColor("#ea7373")
-    .addField("Players", game.players.length.toString())
-    .addField("To Start", "`$uno start`");
-  return message.channel.send({ embed });
+  return gameNotStarted(game, message);
 }
 
 function shuffleCards(cards: Card[]) {
@@ -125,9 +128,9 @@ function shuffleCards(cards: Card[]) {
   return shuffledCards;
 }
 
-function drawCard(game: Game) {
+function drawCard(game: Game, initDraw: boolean) {
   const card = game.deck.pop();
-  if (card) {
+  if (card && !initDraw) {
     game.discard.push(card);
   }
   return card;
@@ -137,13 +140,7 @@ function startGame(message: Message) {
   const newDeck = shuffleCards(unoDeck);
   const game = games.find((g) => g.id === message.channel.id);
   if (!game) {
-    return message.channel.send({
-      embed: {
-        title: "No game found",
-        description: "No game found, create a game with `$uno create`",
-        color: "#ea7373",
-      },
-    });
+    return noGameFound(message);
   }
   if (game.started) {
     return message.channel.send({
@@ -169,10 +166,9 @@ function startGame(message: Message) {
   game.turn = 1;
   game.turnCount = 1;
   game.currentPlayer = game.players[0];
-  //draw 7 cards for each player
   game.players.forEach((player) => {
     for (let i = 0; i < 7; i++) {
-      const card = drawCard(game);
+      const card = drawCard(game, true);
       if (card) {
         player.hand.push(card);
       }
@@ -192,8 +188,51 @@ function startGame(message: Message) {
       "Card on top of pile",
       game.discard[game.discard.length - 1]?.type ?? "None"
     );
+  game.players.forEach((player) => {
+    const playerHand = new MessageEmbed()
+      .setTitle("Your hand")
+      .setDescription(`Game ID: ${game.id}`)
+      .setColor("#ea7373")
+      .addField("Cards", player.hand.length.toString());
+    player.hand.forEach((card: Card) => {
+      playerHand.addField(card.type, card.color);
+    });
+    discordClient.users.fetch(player.id).then((user) => {
+      user.send({ embed: playerHand });
+    });
+  });
+
   return message.channel.send({ embed });
 }
+
+const showHand = (message: Message) => {
+  const game = games.find((g) => g.id === message.channel.id);
+  if (!game) {
+    return noGameFound(message);
+  }
+  if (!game.started) {
+    return gameNotStarted(game, message);
+  }
+  const player = game.players.find((p) => p.id === message.author.id);
+  if (!player) {
+    return message.channel.send({
+      embed: {
+        title: "Not in game",
+        description: "You are not in this game",
+        color: "#ea7373",
+      },
+    });
+  }
+  const embed = new MessageEmbed()
+    .setTitle("Your hand")
+    .setDescription(`Game ID: ${game.id}`)
+    .setColor("#ea7373")
+    .addField("Cards", player.hand.length.toString());
+  player.hand.forEach((card) => {
+    embed.addField(card.type, card.color);
+  });
+  return message.author.send({ embed });
+};
 
 const argsFunction: any = {
   create: (message: Message) => {
@@ -207,6 +246,9 @@ const argsFunction: any = {
   },
   start: (message: Message) => {
     startGame(message);
+  },
+  hand: (message: Message) => {
+    showHand(message);
   },
 };
 
