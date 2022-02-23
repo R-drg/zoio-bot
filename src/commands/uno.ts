@@ -205,13 +205,16 @@ const argsFunction: any = {
   status: (message: Message) => {
     showStatus(message);
   },
+  start: (message: Message) => {
+    startGame(message);
+  },
 };
 
 export default {
   name: "uno",
   description: "Play uno games",
   execute(message: Message, args: string[]) {
-    if (args.length === 0) {
+    if (args.length === 0 || !argsFunction[args[0]]) {
       const embed = new MessageEmbed({
         title: "How to play Uno",
         description:
