@@ -16,6 +16,16 @@ const noGameFound = (message: Message) => {
   });
 };
 
+const noPlayerFound = (message: Message) => {
+  return message.channel.send({
+    embed: {
+      title: "Not in game",
+      description: "You are not in this game",
+      color: "#ea7373",
+    },
+  });
+};
+
 const gameNotStarted = (game: Game, message: Message) => {
   const embed = new MessageEmbed()
     .setTitle("Game not started")
@@ -111,9 +121,11 @@ function showStatus(message: Message) {
       .addField("Players", game.players.length.toString())
       .addField(
         "Card on top of pile",
-        `${game.discard[game.discard.length - 1]?.type} - ${
-          game.discard[game.discard.length - 1]?.color
-        }` ?? "None"
+        game.discard.length != 0
+          ? `${game.discard[game.discard.length - 1]?.type} - ${
+              game.discard[game.discard.length - 1]?.color
+            }`
+          : "None"
       );
     return message.channel.send({ embed });
   }
@@ -188,9 +200,11 @@ function startGame(message: Message) {
     .addField("Players", game.players.length.toString())
     .addField(
       "Card on top of pile",
-      `${game.discard[game.discard.length - 1]?.type} - ${
-        game.discard[game.discard.length - 1]?.color
-      }` ?? "None"
+      game.discard.length != 0
+        ? `${game.discard[game.discard.length - 1]?.type} - ${
+            game.discard[game.discard.length - 1]?.color
+          }`
+        : "None"
     );
   game.players.forEach((player) => {
     const playerHand = new MessageEmbed()
@@ -219,13 +233,7 @@ const showHand = (message: Message) => {
   }
   const player = game.players.find((p) => p.id === message.author.id);
   if (!player) {
-    return message.channel.send({
-      embed: {
-        title: "Not in game",
-        description: "You are not in this game",
-        color: "#ea7373",
-      },
-    });
+    return noPlayerFound(message);
   }
   const embed = new MessageEmbed()
     .setTitle("Your hand")
@@ -305,7 +313,8 @@ const playCard = (message: Message) => {
     card.type != "Wild" &&
     card.type != "Wild Draw Four" &&
     game.discard[game.discard.length - 1]?.color != card.color &&
-    game.discard[game.discard.length - 1]?.type != card.type
+    game.discard[game.discard.length - 1]?.type != card.type &&
+    game.discard.length != 0
   ) {
     return message.channel.send({
       embed: {
@@ -327,10 +336,10 @@ const playCard = (message: Message) => {
     }
     const newColor = args[4];
     if (
-      newColor !== "Red" &&
-      newColor !== "Blue" &&
-      newColor !== "Green" &&
-      newColor !== "Yellow"
+      newColor.toLowerCase() !== "Red".toLowerCase() &&
+      newColor.toLowerCase() !== "Blue".toLowerCase() &&
+      newColor.toLowerCase() !== "Green".toLowerCase() &&
+      newColor.toLowerCase() !== "Yellow".toLowerCase()
     ) {
       return message.channel.send({
         embed: {
@@ -345,19 +354,24 @@ const playCard = (message: Message) => {
   player.hand = player.hand.filter(
     (c) => c.type !== card.type || c.color !== card.color
   );
+  delete player.hand[player.hand.indexOf(card)];
   game.discard.push(card);
   if (card.type === "Draw Two") {
     for (let i = 0; i < 2; i++) {
       const card = drawCard(game, false);
       if (card) {
-        player.hand.push(card);
+        game.players[
+          (game.players.indexOf(player) + 1) % game.players.length
+        ].hand.push(card);
       }
     }
   } else if (card.type === "Wild Draw Four") {
     for (let i = 0; i < 4; i++) {
       const card = drawCard(game, false);
       if (card) {
-        player.hand.push(card);
+        game.players[
+          (game.players.indexOf(player) + 1) % game.players.length
+        ].hand.push(card);
       }
     }
   } else if (card.type === "Skip") {
@@ -365,6 +379,18 @@ const playCard = (message: Message) => {
       game.players[(game.players.indexOf(player) + 1) % game.players.length];
   } else if (card.type === "Reverse") {
     game.players.reverse();
+  }
+  //check if game is over
+  if (player.hand.length === 0) {
+    const winner = player;
+    delete games[games.indexOf(game)];
+    return message.channel.send({
+      embed: {
+        title: "Game over",
+        description: `${winner.name} won the game`,
+        color: "#ea7373",
+      },
+    });
   }
   game.turnCount++;
   // skip to next player
@@ -386,13 +412,76 @@ const playCard = (message: Message) => {
     .addField("Players", game.players.length.toString())
     .addField(
       "Card on top of pile",
-      `${game.discard[game.discard.length - 1]?.type} - ${
-        game.discard[game.discard.length - 1]?.color
-      }` ?? "None"
+      game.discard.length != 0
+        ? `${game.discard[game.discard.length - 1]?.type} - ${
+            game.discard[game.discard.length - 1]?.color
+          }`
+        : "None"
     );
 
   return message.channel.send({ embed });
 };
+
+function playerDrawCard(message: Message) {
+  const game = games.find((g) => g.id === message.channel.id);
+  if (!game) {
+    return noGameFound(message);
+  }
+  const player = game.players.find((p) => p.id === message.author.id);
+  if (!player) {
+    return noPlayerFound(message);
+  }
+  if (game.currentPlayer?.id !== message.author.id) {
+    return message.channel.send({
+      embed: {
+        title: "Not your turn",
+        description: "It is not your turn",
+        color: "#ea7373",
+      },
+    });
+  }
+  const card = drawCard(game, false);
+  if (!card) {
+    return message.channel.send({
+      embed: {
+        title: "No cards left",
+        description: "No cards left in deck",
+        color: "#ea7373",
+      },
+    });
+  }
+  player.hand.push(card);
+  logger.info(`Card drawn`, { game, player, card });
+  const embed = new MessageEmbed()
+    .setTitle("Card drawn")
+    .setDescription(`Game ID: ${game.id}`)
+    .setColor("#ea7373")
+    .addField("Current Player", game.currentPlayer?.name ?? "None")
+    .addField("Turn", game.turnCount.toString())
+    .addField("Discard", game.discard.length.toString())
+    .addField("Deck", game.deck.length.toString())
+    .addField("Players", game.players.length.toString())
+    .addField(
+      "Card on top of pile",
+      game.discard.length != 0
+        ? `${game.discard[game.discard.length - 1]?.type} - ${
+            game.discard[game.discard.length - 1]?.color
+          }`
+        : "None"
+    );
+
+  const embedCard = new MessageEmbed()
+    .setTitle("Draw Card")
+    .setDescription(`Game ID: ${game.id}`)
+    .setColor("#ea7373")
+    .addField("Card", `${card.type} - ${card.color}`);
+
+  return message.channel.send({ embed }).then(() => {
+    discordClient.users.fetch(player.id).then((user) => {
+      user.send(embedCard);
+    });
+  });
+}
 
 const argsFunction: any = {
   create: (message: Message) => {
@@ -412,6 +501,9 @@ const argsFunction: any = {
   },
   play: (message: Message) => {
     playCard(message);
+  },
+  draw: (message: Message) => {
+    playerDrawCard(message);
   },
 };
 
