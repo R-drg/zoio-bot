@@ -55,7 +55,7 @@ function createGame(message: Message) {
     currentPlayer: null,
   };
   games.push(game);
-  logger.info(`Created game`, { game });
+  logger.info(`Created game`, game.id);
   const embed = new MessageEmbed()
     .setTitle("New game created")
     .setDescription(`Game ID: ${game.id}`)
@@ -95,7 +95,7 @@ function joinGame(message: Message) {
     turn: false,
   };
   game.players.push(player);
-  logger.info(`Player joined game`, { game, player });
+  logger.info(`Player joined game`, game.id, player.name);
   const embed = new MessageEmbed()
     .setTitle("Player joined game")
     .setDescription(`${message.author.username} joined the game`)
@@ -280,7 +280,13 @@ const playCard = (message: Message) => {
       },
     });
   }
-  player.hand.forEach((c) => {});
+  if (args[2] === "wild" && args[3] === "draw") {
+    args[2] = args[2] + " " + args[3] + " " + args[4];
+    args[3] = args[5];
+  }
+  if (args[2] === "draw" && args[3] === "two") {
+    args[2] = args[2] + " " + args[3];
+  }
   const card = player.hand.filter((c) => {
     if (
       c.type.toLowerCase() == args[2].toLowerCase() &&
@@ -392,7 +398,6 @@ const playCard = (message: Message) => {
         (game.players.indexOf(game.currentPlayer) + 1) % game.players.length
       ];
   }
-  logger.info(`Card played`, { game, player, card });
   const embed = new MessageEmbed()
     .setTitle("Card played")
     .setDescription(`Game ID: ${game.id}`)
@@ -443,7 +448,6 @@ function playerDrawCard(message: Message) {
     });
   }
   player.hand.push(card);
-  logger.info(`Card drawn`, { game, player, card });
   const embed = new MessageEmbed()
     .setTitle("Card drawn")
     .setDescription(`Game ID: ${game.id}`)
