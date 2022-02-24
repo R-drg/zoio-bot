@@ -280,12 +280,7 @@ const playCard = (message: Message) => {
       },
     });
   }
-  player.hand.forEach((c) => {
-    console.log(c.type == args[2]);
-    console.log(c.type, args[2]);
-    console.log(c.color == args[3]);
-    console.log(c.color, args[3]);
-  });
+  player.hand.forEach((c) => {});
   const card = player.hand.filter((c) => {
     if (
       c.type.toLowerCase() == args[2].toLowerCase() &&
@@ -295,7 +290,6 @@ const playCard = (message: Message) => {
     }
     return false;
   })[0];
-  console.log(card);
   if (!card) {
     return message.channel.send({
       embed: {
