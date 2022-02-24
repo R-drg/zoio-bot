@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "dotenv node dist/index",
-    "build": "doetenv tsc",
+    "build": "dotenv tsc",
     "dev": "dotenv nodemon src/index.ts"
   },
   "dependencies": {
