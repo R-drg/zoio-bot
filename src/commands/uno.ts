@@ -280,13 +280,14 @@ const playCard = (message: Message) => {
       },
     });
   }
-  if (args[2] === "wild" && args[3] === "draw") {
+  if (args[2].toLowerCase() === "wild" && args[3].toLowerCase() === "draw") {
     args[2] = args[2] + " " + args[3] + " " + args[4];
-    args[3] = args[5];
+    args[4] = args[5];
   }
-  if (args[2] === "draw" && args[3] === "two") {
+  if (args[2].toLowerCase() === "draw" && args[3].toLowerCase() === "two") {
     args[2] = args[2] + " " + args[3];
   }
+  console.log(args[2]);
   const card = player.hand.filter((c) => {
     if (
       c.type.toLowerCase() == args[2].toLowerCase() &&
