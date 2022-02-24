@@ -22,12 +22,10 @@ export const discordClient = (function () {
 
   client.commands = new Collection();
 
-  const commandFiles = fs
-    .readdirSync("src/commands")
-    .filter((file) => file.endsWith(FILE_EXTENSION));
+  const commandFiles = fs.readdirSync(__dirname + "/commands");
 
   for (const file of commandFiles) {
-    const command = require(`./commands/${file}`).default;
+    const command = require(`${__dirname}/commands/${file}`).default;
     client.commands.set(command.name, command);
   }
 
