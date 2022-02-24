@@ -15,6 +15,7 @@ declare module "discord.js" {
 }
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
+const FILE_EXTENSION = process.env.FILE_EXTENSION ?? "";
 
 export const discordClient = (function () {
   const client = new Client();
@@ -23,7 +24,7 @@ export const discordClient = (function () {
 
   const commandFiles = fs
     .readdirSync("src/commands")
-    .filter((file) => file.endsWith(".ts"));
+    .filter((file) => file.endsWith(FILE_EXTENSION));
 
   for (const file of commandFiles) {
     const command = require(`./commands/${file}`).default;

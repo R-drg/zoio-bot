@@ -13,8 +13,8 @@
     "typescript": "^4.5.5"
   },
   "scripts": {
-    "start": "node dist/index",
-    "build": "tsc",
+    "start": "dotenv node dist/index",
+    "build": "doetenv tsc",
     "dev": "dotenv nodemon src/index.ts"
   },
   "dependencies": {
