@@ -142,11 +142,8 @@ function shuffleCards(cards: Card[]) {
   return shuffledCards;
 }
 
-function drawCard(game: Game, initDraw: boolean) {
+function drawCard(game: Game) {
   const card = game.deck.pop();
-  if (card && !initDraw) {
-    game.discard.push(card);
-  }
   return card;
 }
 
@@ -182,7 +179,7 @@ function startGame(message: Message) {
   game.currentPlayer = game.players[0];
   game.players.forEach((player) => {
     for (let i = 0; i < 7; i++) {
-      const card = drawCard(game, true);
+      const card = drawCard(game);
       if (card) {
         player.hand.push(card);
       }
@@ -349,7 +346,8 @@ const playCard = (message: Message) => {
         },
       });
     }
-    card.color = newColor as Color;
+    const newColorUpper = newColor.charAt(0).toUpperCase() + newColor.slice(1);
+    card.color = newColorUpper as Color;
   }
   player.hand = player.hand.filter(
     (c) => c.type !== card.type || c.color !== card.color
@@ -358,7 +356,7 @@ const playCard = (message: Message) => {
   game.discard.push(card);
   if (card.type === "Draw Two") {
     for (let i = 0; i < 2; i++) {
-      const card = drawCard(game, false);
+      const card = drawCard(game);
       if (card) {
         game.players[
           (game.players.indexOf(player) + 1) % game.players.length
@@ -367,7 +365,7 @@ const playCard = (message: Message) => {
     }
   } else if (card.type === "Wild Draw Four") {
     for (let i = 0; i < 4; i++) {
-      const card = drawCard(game, false);
+      const card = drawCard(game);
       if (card) {
         game.players[
           (game.players.indexOf(player) + 1) % game.players.length
@@ -440,7 +438,7 @@ function playerDrawCard(message: Message) {
       },
     });
   }
-  const card = drawCard(game, false);
+  const card = drawCard(game);
   if (!card) {
     return message.channel.send({
       embed: {
